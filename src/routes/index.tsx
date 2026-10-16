@@ -169,7 +169,7 @@ function Index() {
         </main>
 
         <button onClick={() => setOpen(true)} aria-label="Report outage"
-          className="glow fixed bottom-24 left-1/2 ml-[calc(min(28rem,100vw)/2-4.5rem)] grid h-14 w-14 place-items-center rounded-full bg-primary text-primary-foreground">
+          className="glow fixed bottom-24 right-[max(1.25rem,calc(50vw-12.75rem))] grid h-14 w-14 place-items-center rounded-full bg-primary text-primary-foreground">
           <Plus size={26} />
         </button>
 
