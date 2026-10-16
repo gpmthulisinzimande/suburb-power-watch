@@ -60,9 +60,9 @@ function Index() {
 
   const now = new Date();
   const hour = now.getHours();
-  const slots = SCHEDULE[area];
+  const slots = SCHEDULE[area] ?? [];
   const current = slots.find((s) => hour >= s && hour < s + 2);
-  const next = slots.find((s) => s > hour) ?? slots[0];
+  const next = slots.find((s) => s > hour) ?? slots[0] ?? 0;
   const hoursToNext = ((next - hour + 24) % 24) || 24;
   const areaReports = reports.filter((r) => r.area === area);
   const waterIssue = areaReports.some((r) => r.kind === "water");
