@@ -29,7 +29,7 @@ const SEED: Report[] = [
   { id: "1", kind: "water", area: "Soweto", note: "No water in Orlando East since 5am", time: Date.now() - 50 * 60000, confirms: 23 },
   { id: "2", kind: "power", area: "Alexandra", note: "Transformer blew on 7th Ave", time: Date.now() - 20 * 60000, confirms: 41 },
   { id: "3", kind: "water", area: "Tembisa", note: "Low pressure, Joburg Water truck at the clinic", time: Date.now() - 2 * 3600000, confirms: 9 },
-  { id: "4", kind: "power", area: "Randburg", note: "Power back on in Ferndale ✅", time: Date.now() - 3 * 3600000, confirms: 5 },
+  { id: "4", kind: "power", area: "Randburg", note: "Power back on in Ferndale", time: Date.now() - 3 * 3600000, confirms: 5 },
 ];
 
 const TIPS = [
