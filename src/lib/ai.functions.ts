@@ -15,9 +15,9 @@ export type AdviceResult =
 
 export const getOutageAdvice = createServerFn({ method: "POST" })
   .inputValidator((data) => inputSchema.parse(data))
-  .handler(async ({ data, signal }): Promise<AdviceResult> => {
+  .handler(async ({ data }): Promise<AdviceResult> => {
     try {
-      const advice = await generateOutageAdvice({ ...data, signal });
+      const advice = await generateOutageAdvice(data);
       return { ok: true, ...advice };
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") throw error;

@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Zap, Droplets, Bell, MapPin, Plus, ThumbsUp, Lightbulb, Home, Users, X } from "lucide-react";
+import { Zap, Droplets, Bell, MapPin, Plus, ThumbsUp, Lightbulb, Home, Users, X, Sparkles } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+
+import { getOutageAdvice } from "@/lib/ai.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -15,7 +18,7 @@ export const Route = createFileRoute("/")({
 });
 
 type Kind = "power" | "water";
-type Report = { id: string; kind: Kind; area: string; note: string; time: number; confirms: number };
+type Report = { id: string; kind: Kind; area: string; note: string; time: number; confirms: number; summary?: string; steps?: string[] };
 
 const AREAS = ["Soweto", "Alexandra", "Sandton", "Randburg", "Tembisa", "Diepsloot", "Midrand", "Braamfontein"];
 
@@ -146,6 +149,17 @@ function Index() {
                     <span>{ago(r.time)}</span>
                   </div>
                   <p className="mt-2">{r.note}</p>
+                  {r.summary && (
+                    <div className="mt-3 rounded-xl bg-secondary p-3">
+                      <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-primary"><Sparkles size={12} /> AI summary</p>
+                      <p className="mt-1 text-sm">{r.summary}</p>
+                      <ul className="mt-2 space-y-1">
+                        {r.steps?.map((s, i) => (
+                          <li key={s} className="flex gap-2 text-xs text-muted-foreground"><span className="text-primary">{i + 1}.</span><span>{s}</span></li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <button onClick={() => confirm(r.id)}
                     className={`mt-3 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${confirmed.includes(r.id) ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>
                     <ThumbsUp size={14} /> Me too · {r.confirms}
@@ -202,16 +216,30 @@ function ReportSheet({ area, onClose, onSubmit }: { area: string; onClose: () =>
   const [kind, setKind] = useState<Kind>("power");
   const [note, setNote] = useState("");
   const [where, setWhere] = useState(area);
+  const [advice, setAdvice] = useState<{ summary: string; steps: string[] } | null>(null);
+  const [adviceBusy, setAdviceBusy] = useState(false);
+  const [adviceError, setAdviceError] = useState("");
+  const fetchAdvice = useServerFn(getOutageAdvice);
+
+  const askAdvice = async () => {
+    setAdviceBusy(true);
+    setAdviceError("");
+    const res = await fetchAdvice({ data: { kind, area: where, note: note.trim() } });
+    if (res.ok) setAdvice({ summary: res.summary, steps: res.steps });
+    else setAdviceError(res.error);
+    setAdviceBusy(false);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-background/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="mx-auto w-full max-w-md rounded-t-3xl bg-card p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="mx-auto max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-card p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-bold">Report an outage</h3>
           <button onClick={onClose} aria-label="Close"><X /></button>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2">
           {(["power", "water"] as const).map((k) => (
-            <button key={k} onClick={() => setKind(k)}
+            <button key={k} onClick={() => { setKind(k); setAdvice(null); setAdviceError(""); }}
               className={`flex items-center justify-center gap-2 rounded-xl py-3 font-medium ${kind === k ? (k === "power" ? "bg-primary text-primary-foreground" : "bg-water text-water-foreground") : "bg-secondary"}`}>
               {k === "power" ? <Zap size={18} /> : <Droplets size={18} />} {k === "power" ? "No power" : "No water"}
             </button>
@@ -222,8 +250,28 @@ function ReportSheet({ area, onClose, onSubmit }: { area: string; onClose: () =>
         </select>
         <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="What's happening? e.g. No water on Vilakazi St"
           className="mt-3 h-24 w-full rounded-xl bg-secondary p-3 outline-none placeholder:text-muted-foreground" />
+        {!advice && !adviceBusy && note.trim().length >= 5 && (
+          <button onClick={askAdvice}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 py-3 font-medium text-primary">
+            <Sparkles size={16} /> Summarize with AI & get next steps
+          </button>
+        )}
+        {adviceBusy && <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground"><Sparkles size={14} className="animate-pulse" /> Thinking…</p>}
+        {adviceError && <p className="mt-3 text-xs text-destructive">{adviceError}</p>}
+        {advice && (
+          <div className="mt-3 rounded-xl bg-secondary p-3">
+            <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-primary"><Sparkles size={12} /> AI summary</p>
+            <p className="mt-1 text-sm">{advice.summary}</p>
+            <p className="mt-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">What to do now</p>
+            <ul className="mt-1 space-y-1">
+              {advice.steps.map((s, i) => (
+                <li key={s} className="flex gap-2 text-sm"><span className="text-primary">{i + 1}.</span><span>{s}</span></li>
+              ))}
+            </ul>
+          </div>
+        )}
         <button disabled={!note.trim()}
-          onClick={() => onSubmit({ id: crypto.randomUUID(), kind, area: where, note: note.trim(), time: Date.now(), confirms: 1 })}
+          onClick={() => onSubmit({ id: crypto.randomUUID(), kind, area: where, note: note.trim(), time: Date.now(), confirms: 1, ...(advice ? { summary: advice.summary, steps: advice.steps } : {}) })}
           className="mt-3 w-full rounded-xl bg-primary py-3 font-bold text-primary-foreground disabled:opacity-40">
           Share with neighbours
         </button>
