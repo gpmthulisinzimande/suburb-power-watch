@@ -39,7 +39,6 @@ export async function generateOutageAdvice(input: {
   kind: "power" | "water";
   area: string;
   note: string;
-  signal?: AbortSignal;
 }): Promise<OutageAdvice> {
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
@@ -62,7 +61,6 @@ export async function generateOutageAdvice(input: {
         content: `Suburb: ${input.area}\nType of outage: ${input.kind === "power" ? "electricity / load-shedding" : "water"}\nWhat the resident says: ${input.note}`,
       },
     ],
-    abortSignal: input.signal,
     providerOptions: {
       openai: {
         store: false,
