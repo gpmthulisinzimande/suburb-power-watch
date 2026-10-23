@@ -1,9 +1,12 @@
 // Server-only AI Gateway helpers for Khanya.
 // Files matching *.server.* are blocked from client bundles.
 
+import { createOpenAI } from "@ai-sdk/openai";
+import { streamText } from "ai";
+
 const LOVABLE_AIG_RUN_ID_HEADER = "X-Lovable-AIG-Run-ID";
 
-export function createLovableAiGatewayRunIdFetch(initialRunId?: string) {
+function createLovableAiGatewayRunIdFetch(initialRunId?: string) {
   let runId = initialRunId?.trim() || undefined;
   return {
     fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -11,13 +14,9 @@ export function createLovableAiGatewayRunIdFetch(initialRunId?: string) {
       if (runId && !headers.has(LOVABLE_AIG_RUN_ID_HEADER)) {
         headers.set(LOVABLE_AIG_RUN_ID_HEADER, runId);
       }
-      try {
-        const response = await fetch(input, { ...init, headers });
-        runId = response.headers.get(LOVABLE_AIG_RUN_ID_HEADER)?.trim() || runId;
-        return response;
-      } catch (error) {
-        throw error;
-      }
+      const response = await fetch(input, { ...init, headers });
+      runId = response.headers.get(LOVABLE_AIG_RUN_ID_HEADER)?.trim() || runId;
+      return response;
     },
     getRunId: () => runId,
   };
@@ -33,7 +32,7 @@ const INSTRUCTIONS = [
   "1. <short practical next step>",
   "2. <short practical next step>",
   "3. <short practical next step>",
-  "Rules: 3 to 4 steps, each under 15 words, focused on what the resident should do right now (safety, water, appliances, neighbours, reporting). Keep it plain and local — mention Joburg services like City Power or Johannesburg Water only when relevant. Never invent official outage schedules or restoration times.",
+  "Rules: 3 to 4 steps, each under 15 words, focused on what the resident should do right now (safety, water, appliances, neighbours, reporting). Keep it plain and local — mention City Power or Johannesburg Water only when relevant. Never invent official outage schedules or restoration times.",
 ].join("\n");
 
 export async function generateOutageAdvice(input: {
@@ -44,10 +43,6 @@ export async function generateOutageAdvice(input: {
 }): Promise<OutageAdvice> {
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
-
-  const { createOpenAI } = await import("@ai-sdk/openai");
-  const { streamText } = await import("ai");
-  const { createLovableAiGatewayRunIdFetch } = await import("./run-id-server");
 
   const runIdFetch = createLovableAiGatewayRunIdFetch();
   const provider = createOpenAI({
@@ -83,15 +78,11 @@ export async function generateOutageAdvice(input: {
 
   const summaryMatch = text.match(/SUMMARY:\s*(.+)/i);
   const summary = (summaryMatch?.[1] ?? text.split("\n")[0] ?? "").trim();
-  const steps = text
+  const stepsBlock = summaryMatch ? text.slice(text.indexOf(summaryMatch[0]) + summaryMatch[0].length) : text;
+  const steps = stepsBlock
     .split("\n")
     .map((line) => line.replace(/^\s*\d+[.)]\s*/, "").trim())
-    .filter((line) => {
-      const afterSummary = summaryMatch ? text.indexOf(summaryMatch[0]) : 0;
-      const idx = text.indexOf(line);
-      return idx > afterSummary && line.length > 3 && !/^SUMMARY:/i.test(line);
-    })
-    .filter((line, i, arr) => arr.indexOf(line) === i)
+    .filter((line) => line.length > 3 && !/^STEPS:/i.test(line))
     .slice(0, 4);
 
   if (!summary || steps.length === 0) {
